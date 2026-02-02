@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: user-management-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: user_management_db
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/setup.sql:/docker-entrypoint-initdb.d/setup.sql
+    networks:
+      - user-management-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: user-management-backend
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/user_management_db
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+    ports:
+      - "8080:8080"
+    depends_on:
+      - mysql
+    networks:
+      - user-management-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: user-management-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - user-management-network
+
+volumes:
+  mysql_data:
+
+networks:
+  user-management-network:
+    driver: bridge
