@@ -1,0 +1,36 @@
+pipeline {
+  agent   any
+
+  stages { 
+    stage('Checkout') {
+      steps {
+        git url: 'https://github.com/douaatarres/user-management-app.git'
+      }
+    }
+
+    stage('Build') {
+      steps {
+        dir('backend') {
+          sh 'mvn clean verify'
+          }
+        }
+  }
+
+  
+    stage('SonarQube Analysis') {
+      steps {
+        dir('backend') {
+          withCredentials([string(credentialsId: 'jenkins-sonar', variable: 'SONAR_TOKEN')]) {
+            sh '''
+              mvn clean verify sonar:sonar \
+                -Dsonar.login=$SONAR_TOKEN \
+            '''
+            }
+        }
+      }
+    }
+}
+}
+
+
+
