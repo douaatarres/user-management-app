@@ -71,7 +71,7 @@
                 	</execution>
             	</executions>
         	</plugin>
-		ss</plugins>
+		</plugins>
 	</build>
 
 </project>
