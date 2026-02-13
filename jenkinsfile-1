@@ -1,0 +1,80 @@
+pipeline {
+  agent any
+
+  environment {
+    IMAGE_NAME = "user-management-app"
+    CONTAINER_NAME = "user-app-container"
+  }
+
+  stages {
+
+    stage('Checkout') {
+      steps {
+        git url: 'https://github.com/douaatarres/user-management-app.git'
+      }
+    }
+
+    stage('Build & test') {
+      steps {
+        dir('backend') {
+          sh 'mvn clean verify'
+        }
+      }
+    }
+
+    stage('owasp Dependency-Check') {
+      steps {
+        dir('backend') {
+          dependencyCheck additionalArguments: '--scan . --format XML --failOnCVSS 7',
+                          odcInstallation: 'DP-Check'
+        }
+        dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
+      }
+    }
+
+    stage('SonarQube Analysis') {
+      steps {
+        dir('backend') {
+          withSonarQubeEnv('sonar') {
+            withCredentials([string(credentialsId: 'jenkins-sonar', variable: 'SONAR_TOKEN')]) {
+              sh '''
+                mvn sonar:sonar \
+                  -Dsonar.login=$SONAR_TOKEN \
+                  -Dsonar.java.coveragePlugin=jacoco \
+                  -Dsonar.jacoco.reportPaths=target/jacoco.exec
+              '''
+            }
+          }
+        }
+      }
+    }
+
+    stage('Quality Gate') {
+      steps {
+        timeout(time: 15, unit: 'MINUTES') {
+          waitForQualityGate abortPipeline: true
+        }
+      }
+    }
+
+    stage('Build docker image') {
+      steps {
+        sh "docker build -t $IMAGE_NAME ./backend"
+      }
+    }
+
+    stage('Scan image') {
+      steps {
+        sh "trivy image --exit-code 1 --severity HIGH,CRITICAL $IMAGE_NAME"
+      }
+    }
+
+    stage('Run Application Container') {
+      steps {
+        sh "docker run -d -p 8080:8080 --name $CONTAINER_NAME $IMAGE_NAME"
+        sh "sleep 30"
+      }
+    }
+
+}
+}
